@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Washington Big Game Hunting 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0e1114;
+    --bg2: #161b20;
+    --bg3: #1e252d;
+    --border: rgba(255,255,255,0.08);
+    --text: #e8e4dc;
+    --muted: #8a9099;
+    --accent: #c8a96e;
+    --ne: #7F77DD;
+    --ok: #EF9F27;
+    --bm: #D4537E;
+    --cas: #4a9e6e;
+    --oly: #378ADD;
+    --sw: #1D9E75;
+    --pal: #888780;
+    --col: #D85A30;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    height: 60px;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+  }
+
+  .subtitle { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  .season-badge {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(200,169,110,0.3);
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 440px;
+    height: calc(100vh - 60px);
+  }
+
+  .map-panel {
+    border-right: 1px solid var(--border);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .map-title {
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+
+  #map-container { flex: 1; position: relative; min-height: 0; }
+  #map-container svg { width: 100%; height: 100%; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 10px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .legend-item:hover { border-color: var(--border); color: var(--text); }
+  .legend-item.active { border-color: var(--border); color: var(--text); background: var(--bg3); }
+  .legend-swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+  .info-panel { display: flex; flex-direction: column; overflow: hidden; height: 100%; }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .tab {
+    padding: 10px 0;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .05em;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+    text-transform: uppercase;
+    flex: 1;
+    text-align: center;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    min-height: 0;
+  }
+
+  .panel-content::-webkit-scrollbar { width: 3px; }
+  .panel-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .section-label {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 14px 0 6px;
+  }
+
+  .section-label:first-child { margin-top: 0; }
+
+  .info-grid { display: flex; flex-direction: column; }
+
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .info-row:last-child { border-bottom: none; }
+  .info-label { color: var(--muted); flex-shrink: 0; max-width: 60%; line-height: 1.4; }
+  .info-val { color: var(--text); text-align: right; line-height: 1.4; }
+  .info-val.good { color: #4a9e6e; }
+  .info-val.warn { color: var(--accent); }
+  .info-val.bad { color: #c0535a; }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3,1fr);
+    gap: 6px;
+    margin-bottom: 9px;
+  }
+
+  .stat-box {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 8px 10px;
+  }
+
+  .stat-lbl { font-size: 9px; color: var(--muted); margin-bottom: 2px; text-transform: uppercase; letter-spacing: .06em; }
+  .stat-num { font-size: 15px; font-weight: 500; color: var(--accent); font-family: 'Playfair Display', serif; line-height: 1.2; }
+  .stat-unit { font-size: 10px; color: var(--muted); }
+
+  .pill-row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+
+  .pill {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    border: 1px solid;
+    line-height: 1.6;
+  }
+
+  .pill-green { color: #4a9e6e; border-color: rgba(74,158,110,0.3); background: rgba(74,158,110,0.07); }
+  .pill-amber { color: var(--accent); border-color: rgba(200,169,110,0.3); background: rgba(200,169,110,0.07); }
+  .pill-red { color: #c0535a; border-color: rgba(192,83,90,0.3); background: rgba(192,83,90,0.07); }
+  .pill-blue { color: #5ba3d4; border-color: rgba(91,163,212,0.3); background: rgba(91,163,212,0.07); }
+
+  .weather-box {
+    background: rgba(91,163,212,0.05);
+    border: 1px solid rgba(91,163,212,0.15);
+    border-radius: 6px;
+    padding: 10px 13px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-top: 8px;
+  }
+
+  .weather-box strong { color: #5ba3d4; font-weight: 500; }
+
+  .layer-row { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+
+  .layer-item { display: flex; gap: 9px; font-size: 12px; align-items: flex-start; }
+
+  .layer-badge {
+    font-size: 9px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .layer-base { background: rgba(200,169,110,0.12); color: var(--accent); }
+  .layer-mid { background: rgba(74,158,110,0.12); color: #4a9e6e; }
+  .layer-outer { background: rgba(91,163,212,0.12); color: #5ba3d4; }
+
+  .region-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 11px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .region-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .region-name { font-family: 'Playfair Display', serif; font-size: 17px; color: var(--text); }
+
+  .map-tooltip {
+    position: absolute;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--text);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+    max-width: 170px;
+    z-index: 10;
+  }
+
+  .county-path { transition: opacity 0.12s; cursor: pointer; }
+  .county-path:hover { opacity: 0.7; }
+
+  .season-val { font-family: 'Playfair Display', serif; color: var(--accent); font-size: 13px; text-align: right; flex-shrink: 0; }
+
+  .pl-banner {
+    background: rgba(74,158,110,0.07);
+    border: 1px solid rgba(74,158,110,0.18);
+    border-radius: 5px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    line-height: 1.6;
+  }
+
+  .pl-banner strong { color: #4a9e6e; }
+
+  .tool-links {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .tool-link {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    text-decoration: none;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.15s;
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .tool-link:hover { border-color: rgba(200,169,110,0.4); background: var(--bg2); }
+
+  .tool-link-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .tool-link-body { display: flex; flex-direction: column; }
+  .tool-link-name { color: var(--accent); font-weight: 500; font-size: 12px; line-height: 1.2; }
+  .tool-link-desc { color: var(--muted); font-size: 10px; line-height: 1.3; margin-top: 1px; }
+
+  .shop-grid { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; }
+
+  .shop-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .shop-item:last-child { border-bottom: none; }
+  .shop-name { color: var(--text); }
+  .shop-note { color: var(--muted); font-size: 11px; text-align: right; }
+
+  .wa-note {
+    font-size: 10px;
+    color: var(--muted);
+    font-style: italic;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 860px) {
+    body { overflow: auto; }
+    .layout { grid-template-columns: 1fr; height: auto; }
+    .map-panel { height: 340px; border-right: none; border-bottom: 1px solid var(--border); }
+    header { height: auto; padding: 14px 16px; }
+    h1 { font-size: 18px; }
+    .panel-content { max-height: 60vh; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Washington Big Game Hunting</h1>
+    <div class="subtitle">Resident pricing &nbsp;·&nbsp; OTC tags &nbsp;·&nbsp; Public land &nbsp;·&nbsp; Modern firearm</div>
+  </div>
+  <div class="season-badge">2026–27 Season</div>
+</header>
+
+<div class="layout">
+
+  <div class="map-panel">
+    <div class="map-title">Click any county or legend item to load region details</div>
+    <div id="map-container">
+      <div class="map-tooltip" id="tooltip"></div>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="info-panel">
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('overview',this)">Overview</button>
+      <button class="tab" onclick="showTab('region',this)">Region</button>
+      <button class="tab" onclick="showTab('seasons',this)">Seasons</button>
+      <button class="tab" onclick="showTab('license',this)">License</button>
+    </div>
+
+    <div class="panel-content">
+
+      <!-- OVERVIEW -->
+      <div id="overview" class="panel active">
+
+        <div class="pl-banner">
+          <strong>Public land.</strong> All three top picks have strong access via National Forest and WDFW land.
+        </div>
+
+        <div class="section-label">Top 3 picks from Spokane</div>
+
+        <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap;">
+            <span style="width:9px;height:9px;border-radius:2px;background:var(--ne);display:inline-block;flex-shrink:0;"></span>
+            <span style="font-family:'Playfair Display',serif;font-size:14px;">1. NE Forests — whitetail deer</span>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-box"><div class="stat-lbl">WA success rate</div><div class="stat-num">30<span class="stat-unit">%+</span></div></div>
+            <div class="stat-box"><div class="stat-lbl">Drive from Spokane</div><div class="stat-num">1–2<span class="stat-unit">hr</span></div></div>
+            <div class="stat-box"><div class="stat-lbl">Rifle opens</div><div class="stat-num" style="font-size:12px;line-height:1.3;">Oct 17</div></div>
+          </div>
+          <div class="pill-row">
+            <span class="pill pill-green">OTC</span>
+            <span class="pill pill-green">1.1M acres Colville NF</span>
+            <span class="pill pill-blue">Oct 25–45°F</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap;">
+            <span style="width:9px;height:9px;border-radius:2px;background:var(--ok);display:inline-block;flex-shrink:0;"></span>
+            <span style="font-family:'Playfair Display',serif;font-size:14px;">2. Okanogan — mule deer</span>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-box"><div class="stat-lbl">WA success rate</div><div class="stat-num">20–25<span class="stat-unit">%</span></div></div>
+            <div class="stat-box"><div class="stat-lbl">Drive from Spokane</div><div class="stat-num">3<span class="stat-unit">hr</span></div></div>
+            <div class="stat-box"><div class="stat-lbl">Style</div><div class="stat-num" style="font-size:11px;line-height:1.3;">Glass+stalk</div></div>
+          </div>
+          <div class="pill-row">
+            <span class="pill pill-green">OTC</span>
+            <span class="pill pill-green">Open glassing country</span>
+            <span class="pill pill-blue">Oct 20–45°F windy</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap;">
+            <span style="width:9px;height:9px;border-radius:2px;background:var(--bm);display:inline-block;flex-shrink:0;"></span>
+            <span style="font-family:'Playfair Display',serif;font-size:14px;">3. Blue Mountains — elk + deer</span>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-box"><div class="stat-lbl">WA deer success</div><div class="stat-num">20–25<span class="stat-unit">%</span></div></div>
+            <div class="stat-box"><div class="stat-lbl">Drive from Spokane</div><div class="stat-num">4<span class="stat-unit">hr</span></div></div>
+            <div class="stat-box"><div class="stat-lbl">Species</div><div class="stat-num" style="font-size:11px;line-height:1.3;">Deer+Elk</div></div>
+          </div>
+          <div class="pill-row">
+            <span class="pill pill-green">OTC</span>
+            <span class="pill pill-green">Best big game density in WA</span>
+            <span class="pill pill-blue">Oct 25–50°F</span>
+            <span class="pill pill-red">Steep pack-outs</span>
+          </div>
+        </div>
+
+        <div class="section-label">Washington deer vs elk — modern firearm</div>
+        <div class="info-grid">
+          <div class="info-row"><span class="info-label">Deer modern firearm — WA statewide</span><span class="info-val good">30% success</span></div>
+          <div class="info-row"><span class="info-label">Elk modern firearm — WA statewide</span><span class="info-val warn">10–13% success</span></div>
+          <div class="info-row"><span class="info-label">Elk archery — high elevation, September</span><span class="info-val warn">8–12% success</span></div>
+        </div>
+        <div class="wa-note">Washington WDFW statewide harvest data</div>
+
+        <div class="section-label">Spokane gear shops</div>
+        <div class="shop-grid">
+          <div class="shop-item"><span class="shop-name">Sportsman's Warehouse</span><span class="shop-note">Full selection, sells licenses</span></div>
+          <div class="shop-item"><span class="shop-name">White Elephant Sports</span><span class="shop-note">Local institution, knowledgeable staff</span></div>
+          <div class="shop-item"><span class="shop-name">Black Sheep Sporting Goods</span><span class="shop-note">Specialist knowledge</span></div>
+        </div>
+
+        <div class="section-label">Mapping tools</div>
+        <div class="tool-links">
+          <a class="tool-link" href="https://www.onxmaps.com/hunt" target="_blank">
+            <div class="tool-link-icon" style="background:rgba(200,169,110,0.12);">🗺</div>
+            <div class="tool-link-body">
+              <span class="tool-link-name">OnX Hunt</span>
+              <span class="tool-link-desc">Land ownership, GMU lines, offline maps</span>
+            </div>
+          </a>
+          <a class="tool-link" href="https://www.gohunt.com/hunt/washington" target="_blank">
+            <div class="tool-link-icon" style="background:rgba(74,158,110,0.12);">🎯</div>
+            <div class="tool-link-body">
+              <span class="tool-link-name">GoHunt WA</span>
+              <span class="tool-link-desc">Unit profiles, harvest data, research</span>
+            </div>
+          </a>
+        </div>
+
+      </div>
+
+      <!-- REGION -->
+      <div id="region" class="panel">
+        <div id="region-content">
+          <div style="color:var(--muted);font-size:12px;padding:14px 0;">Click a county on the map or a legend item to load region details.</div>
+        </div>
+      </div>
+
+      <!-- SEASONS -->
+      <div id="seasons" class="panel">
+        <div class="section-label">Deer · modern firearm · 2026–27</div>
+        <div class="info-grid">
+          <div class="info-row"><span class="info-label">Whitetail / mule deer — eastern WA</span><span class="season-val">Oct 17–25</span></div>
+          <div class="info-row"><span class="info-label">Blacktail — western WA</span><span class="season-val">Oct 17–31</span></div>
+          <div class="info-row"><span class="info-label">Late whitetail — NE WA select GMUs</span><span class="season-val">Nov 7 – Dec 15</span></div>
+          <div class="info-row"><span class="info-label">Eastern WA season length</span><span class="info-val">~9 days</span></div>
+          <div class="info-row"><span class="info-label">WA statewide success rate</span><span class="info-val good">30%</span></div>
+        </div>
+
+        <div class="section-label">Elk · modern firearm · 2026–27</div>
+        <div class="info-grid">
+          <div class="info-row"><span class="info-label">Eastern WA</span><span class="season-val">Oct 31 – Nov 8</span></div>
+          <div class="info-row"><span class="info-label">Western WA</span><span class="season-val">Nov 7–18</span></div>
+          <div class="info-row"><span class="info-label">Season length</span><span class="info-val">~9 days</span></div>
+          <div class="info-row"><span class="info-label">WA statewide success rate</span><span class="info-val warn">10–13%</span></div>
+        </div>
+
+        <div class="section-label">Included with combo license</div>
+        <div class="info-grid">
+          <div class="info-row"><span class="info-label">Black bear</span><span class="season-val">Aug 1 – Nov 15</span></div>
+          <div class="info-row"><span class="info-label">Cougar</span><span class="season-val">Sep 1 – Apr 30</span></div>
+          <div class="info-row"><span class="info-label">Fall turkey</span><span class="season-val">Sep 1 – Dec 31</span></div>
+          <div class="info-row"><span class="info-label">Forest grouse</span><span class="season-val">Sep 1 – Jan 15</span></div>
+        </div>
+
+        <div class="section-label">Admin</div>
+        <div class="info-grid">
+          <div class="info-row"><span class="info-label">Hunter report deadline</span><span class="info-val">Jan 31, 2027</span></div>
+          <div class="info-row"><span class="info-label">Penalty for missing report</span><span class="info-val bad">$10 fee</span></div>
+        </div>
+      </div>
+
+      <!-- LICENSE -->
+      <div id="license" class="panel">
+        <div class="section-label">Resident pricing · 2026–27</div>
+        <div class="info-grid">
+          <div class="info-row"><span class="info-label">Big Game Combo (deer, elk, bear, cougar + access pass)</span><span class="info-val good">$117.30</span></div>
+          <div class="info-row"><span class="info-label">Deer only</span><span class="info-val">$53.82</span></div>
+          <div class="info-row"><span class="info-label">Elk only</span><span class="info-val">$60.72</span></div>
+          <div class="info-row"><span class="info-label">Get Outdoors Package (all species + fishing)</span><span class="info-val">$322.98</span></div>
+          <div class="info-row"><span class="info-label">Discover Pass (DNR land access)</span><span class="info-val">$45.00</span></div>
+          <div class="info-row"><span class="info-label">Non-resident combo for reference</span><span class="info-val bad">$1,076.40</span></div>
+        </div>
+        <div class="wa-note">Purchase at fishhunt.dfw.wa.gov or any licensed WA dealer</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const regions = [
+  {
+    id:'ne', name:'NE Forests', color:'#7F77DD',
+    counties:['Stevens','Pend Oreille','Ferry','Spokane'],
+    terrain:'Timber, clearcuts, logging road networks, moderate elevation 1,500–5,500 ft',
+    species:'Whitetail deer, black bear, forest grouse, Merriam\'s turkey',
+    publicLand:'Colville National Forest (1.1M acres), WDFW Little Pend Oreille WA (41k acres), DNR blocks',
+    drive:'1–2 hr from Spokane',
+    scope:'Not needed',
+    success:'30%+ deer modern firearm — WA statewide',
+    topGMUs:'105 (Kelly Hill), 111 (Aladdin), 117 (49° North), 121 (Huckleberry), 124 (Mt. Spokane)',
+    access:'Strong public land access',
+    pros:['Highest deer success rate in WA','OTC tag','1.1M acres Colville NF','Closest region to Spokane','Bear tag included free in combo'],
+    cons:['Stand hunting style — limited hiking','Limited glassing in timber','Heavy pressure on opening weekend','CWD testing mandatory in GMUs 124 and 127'],
+    weather:'October: 25–45°F days, overnight lows below freezing common. Expect rain and possible early snow by late Oct. Late whitetail season Nov–Dec: 15–35°F, snow likely.',
+    layers:[
+      {type:'base',label:'Base',desc:'Merino wool or synthetic moisture-wicking. No cotton.'},
+      {type:'mid',label:'Mid',desc:'Fleece or down jacket. Add an insulated bib for stand sits — sitting still at 30°F burns no heat.'},
+      {type:'outer',label:'Outer',desc:'Waterproof rain jacket and pants. Rain is normal in October NE WA.'},
+    ],
+    weatherExtra:'Rubber boots for wet logging road hunting. Hand warmers for long sits. Balaclava for late whitetail season.'
+  },
+  {
+    id:'ok', name:'Okanogan Highlands', color:'#EF9F27',
+    counties:['Okanogan'],
+    terrain:'Open pine ridges, sage basins, real glassing country, 3,000–7,500 ft elevation',
+    species:'Mule deer, black bear, mountain goat (draw only), bighorn sheep (draw only)',
+    publicLand:'Okanogan-Wenatchee National Forest, some BLM and state DNR',
+    drive:'2.5–3.5 hr from Spokane',
+    scope:'Yes — essential',
+    success:'20–25% mule deer modern firearm — WA statewide',
+    topGMUs:'218 (Chewuch), 224 (Pearrygin), 231 (Gardner), 233 (Pogue), 242 (Alta)',
+    access:'Good public land access on National Forest',
+    pros:['Open spot and stalk glassing terrain','OTC mule deer tag','Strong National Forest public access','Most visually dramatic deer hunt in eastern WA'],
+    cons:['Lower success rate than NE forests','Wolf country affects game behavior','Wind can be brutal at elevation','Longer drive than NE forests'],
+    weather:'October: 20–45°F days, nights well below freezing. Wind is constant on open ridges and pushes wind chill 15–20°F lower. Snow possible mid-October at higher elevations.',
+    layers:[
+      {type:'base',label:'Base',desc:'Merino wool — heavier weight. Wind and cold at elevation demand it.'},
+      {type:'mid',label:'Mid',desc:'Insulated puffy jacket. Bring a spare — you will sweat hiking up and freeze glassing.'},
+      {type:'outer',label:'Outer',desc:'Waterproof windproof shell. Wind is the primary threat. Softshell pants for hiking, hardshell for glassing stops.'},
+    ],
+    weatherExtra:'Wind gloves and neck gaiter mandatory. Hand warmers for glassing sessions. Gaiters recommended above 5,000 ft in October.'
+  },
+  {
+    id:'bm', name:'Blue Mountains', color:'#D4537E',
+    counties:['Asotin','Garfield','Columbia','Walla Walla'],
+    terrain:'Steep canyon and ridge, open grassy benches above timbered drainages, basalt rims',
+    species:'Mule deer, Rocky Mountain elk, black bear, Rio Grande turkey',
+    publicLand:'Umatilla National Forest, some BLM canyon land',
+    drive:'3.5–4.5 hr from Spokane',
+    scope:'Yes — on open bench and rim country',
+    success:'20–25% deer, 10–13% elk modern firearm — WA statewide',
+    topGMUs:'145 (Mayview), 154 (Blue Creek), 162 (Dayton), 175 (Lick Creek), 181 (Couse)',
+    access:'Physically demanding — overnight trip recommended',
+    pros:['Best big game density in WA','Mule deer AND elk OTC in same country','Dramatic rim and canyon glassing','Rio Grande turkey available'],
+    cons:['Brutal pack-outs from canyon bottoms','3.5–4.5 hr from Spokane — overnight trip','Steep terrain is physically demanding'],
+    weather:'October: 25–50°F days, lows near freezing in canyons. Rim country is windy. Canyon temps vary 20°F between bottom and rim.',
+    layers:[
+      {type:'base',label:'Base',desc:'Lightweight merino wool. Hiking hard into canyons demands sweat management.'},
+      {type:'mid',label:'Mid',desc:'Lightweight packable insulated jacket. Stow it during hiking legs.'},
+      {type:'outer',label:'Outer',desc:'Waterproof shell for rain and wind on rim. Lightweight matters — steep terrain makes pack weight critical.'},
+    ],
+    weatherExtra:'Frame pack required for elk. Trekking poles strongly recommended for canyon descents. Extra socks — canyon creek crossings are likely.'
+  },
+  {
+    id:'cas', name:'Cascades West Slope', color:'#4a9e6e',
+    counties:['Chelan','Kittitas','Lewis','Pierce','King','Snohomish','Skagit','Whatcom'],
+    terrain:'Dense rainforest, steep glacial terrain, 30–50 yard visibility, 1,500–7,000 ft',
+    species:'Blacktail deer, Roosevelt elk (Cascade herd), black bear',
+    publicLand:'Mt Baker-Snoqualmie NF, Wenatchee NF, Gifford Pinchot NF',
+    drive:'4–5 hr from Spokane',
+    scope:'No — visibility too low',
+    success:'Low to moderate blacktail',
+    topGMUs:'437 (Sultan), 448 (Stillaguamish), 450 (Cedar River), 460 (Snoqualmie)',
+    access:'Good National Forest access — challenging terrain',
+    pros:['Highest black bear density in WA','Roosevelt elk available','Lower hunting pressure midweek'],
+    cons:['Jungle terrain, 30–50 yd visibility','Near-constant rain and cold','Very steep glacial terrain','Blacktail are difficult to pattern'],
+    weather:'October: 35–50°F days but feels colder in wet conditions. Rain near-constant. Expect soaked conditions every day. Snow at elevation by mid-October.',
+    layers:[
+      {type:'base',label:'Base',desc:'Merino wool mandatory — you will be wet constantly. Wool retains warmth when soaked.'},
+      {type:'mid',label:'Mid',desc:'Wool or fleece only — no down. Down is useless when wet. Fleece retains warmth when saturated.'},
+      {type:'outer',label:'Outer',desc:'Premium waterproof shell is essential. Budget rain gear fails in sustained Cascade conditions. Gore-Tex or equivalent.'},
+    ],
+    weatherExtra:'Rubber boots preferred — constant wet ground destroys leather. Gaiters for underbrush. Rain cover for pack.'
+  },
+  {
+    id:'oly', name:'Olympic Peninsula', color:'#378ADD',
+    counties:['Clallam','Jefferson','Mason','Grays Harbor'],
+    terrain:'Temperate rainforest, coastal influence, extremely wet, sea level to 7,900 ft',
+    species:'Roosevelt elk (largest-bodied in North America), blacktail deer, black bear',
+    publicLand:'Olympic National Forest, Olympic NP (limited hunting areas)',
+    drive:'6–7 hr from Spokane',
+    scope:'No',
+    success:'Low — destination trip only',
+    topGMUs:'602 (Dickey), 607 (Pysht), 612 (Olympic), 638 (Quinault), 648 (Wynoochee)',
+    access:'Destination hunt — long drive from Spokane',
+    pros:['Largest Roosevelt elk in North America','Unique bucket list hunt','Dense black bear populations','Low hunting pressure in backcountry'],
+    cons:['6–7 hr from Spokane — needs 5+ day trip','Pack-outs through dense rainforest are brutal','Rain every single day is realistic'],
+    weather:'October: 40–55°F but feels colder due to constant rain and humidity. Annual rainfall in some units exceeds 140 inches. Hypothermia risk is real.',
+    layers:[
+      {type:'base',label:'Base',desc:'Merino wool only. Bring multiple sets — you will get soaked regardless of rain gear.'},
+      {type:'mid',label:'Mid',desc:'Heavy wool or fleece only. No down — useless in 140-inch annual rainfall country.'},
+      {type:'outer',label:'Outer',desc:'Top-tier waterproof shell is non-negotiable. Budget rain gear will fail here.'},
+    ],
+    weatherExtra:'Rubber boots standard. Dry bags for everything in pack. Tarp system for camp. Hypothermia is a real risk in October.'
+  },
+  {
+    id:'sw', name:'SW Coast Range', color:'#1D9E75',
+    counties:['Pacific','Wahkiakum','Cowlitz','Clark'],
+    terrain:'Timber company clearcuts, coastal foothills, logging road mosaic',
+    species:'Blacktail deer (best in WA), Roosevelt elk (Willapa Hills herd), black bear',
+    publicLand:'Mostly private — Weyerhaeuser and Rayonier charge access fees',
+    drive:'5–6 hr from Spokane',
+    scope:'No',
+    success:'Moderate blacktail deer',
+    topGMUs:'506 (Willapa Hills), 510 (Stormking), 520 (Winston), 530 (Ryderwood)',
+    access:'Mostly private timber — access fees required',
+    pros:['Best blacktail hunting in WA','Strong Willapa Hills elk herd','Dense logging road network'],
+    cons:['Mostly private timber — fees apply','5–6 hr from Spokane','Public land options very limited'],
+    weather:'October: 40–55°F, wet and overcast. Rain is frequent. Coastal influence keeps temps milder but humidity makes it feel colder.',
+    layers:[
+      {type:'base',label:'Base',desc:'Merino wool or synthetic moisture-wicking. Avoid cotton.'},
+      {type:'mid',label:'Mid',desc:'Lightweight fleece. Milder temperatures than inland — heavy mid layer is usually overkill.'},
+      {type:'outer',label:'Outer',desc:'Waterproof rain jacket and pants required every day of season.'},
+    ],
+    weatherExtra:'Waterproof boots required. Budget for timber company access permits ($50–200/season).'
+  },
+  {
+    id:'pal', name:'Palouse', color:'#888780',
+    counties:['Whitman','Lincoln','Adams','Franklin'],
+    terrain:'Rolling wheat country, basalt coulees, agricultural draws, mostly flat to rolling',
+    species:'Whitetail deer (big bucks), pheasant, quail',
+    publicLand:'Mostly private farmland — very limited public access',
+    drive:'30 min – 1.5 hr from Spokane',
+    scope:'Sometimes useful in open coulees',
+    success:'Good with private access — limited on public',
+    topGMUs:'139 (Steptoe), 142 (Almota), 130 (Harrington)',
+    access:'Mostly private — public land very limited',
+    pros:['Some of WA\'s biggest whitetail bucks','Closest region to Spokane','Excellent pheasant and quail hunting'],
+    cons:['Mostly private farmland','Very limited public land access','Not suitable without landowner access'],
+    weather:'October: 30–50°F days, cold nights. Wind common on open hills. Drier than west side. Snow possible late October.',
+    layers:[
+      {type:'base',label:'Base',desc:'Lightweight merino or synthetic. Open country walking requires active temperature management.'},
+      {type:'mid',label:'Mid',desc:'Light to medium fleece. Wind on open hills is the main cold driver.'},
+      {type:'outer',label:'Outer',desc:'Windproof shell more important than fully waterproof here. Wind is constant.'},
+    ],
+    weatherExtra:'Wind is the main challenge. Windproof face layer and gloves matter more than heavy rain gear.'
+  },
+  {
+    id:'col', name:'Columbia Basin', color:'#D85A30',
+    counties:['Grant','Douglas','Benton','Franklin'],
+    terrain:'Shrub steppe, high desert, sagebrush flats, river breaks, very open',
+    species:'Mule deer, upland birds (chukar, quail, pheasant), waterfowl, Yakima elk herd nearby',
+    publicLand:'WDFW wildlife areas, BLM land, some state DNR',
+    drive:'2–3 hr from Spokane',
+    scope:'Yes — open desert scanning',
+    success:'Low deer success, best bird hunting in WA',
+    topGMUs:'328 (Naneum), 329 (Quilomene), 335 (Teanaway), 340 (Manastash)',
+    access:'Good public land via WDFW wildlife areas and BLM',
+    pros:['Best chukar, quail, pheasant in WA','Waterfowl along Columbia River','Yakima elk herd in Colockum units'],
+    cons:['Low deer success rates','Hot and dry early season','Primarily a bird hunting destination'],
+    weather:'October: 40–60°F days, nights near 25–35°F. Dry and sunny most days but temperature swings are dramatic — hot midday, cold mornings and evenings.',
+    layers:[
+      {type:'base',label:'Base',desc:'Lightweight moisture-wicking base. Dry conditions and active hunting — overheating is a risk midday.'},
+      {type:'mid',label:'Mid',desc:'Packable light insulation for mornings and evenings. Stow by 10am as midday temps can hit 60°F.'},
+      {type:'outer',label:'Outer',desc:'Windproof light shell. Rain is rare. Wind protection matters more than waterproofing.'},
+    ],
+    weatherExtra:'Sunscreen and sunglasses required. Bring extra water — dry high desert is dehydrating.'
+  }
+];
+
+const countyToRegion = {};
+regions.forEach(r => r.counties.forEach(c => { if(!countyToRegion[c]) countyToRegion[c]=r; }));
+
+function showTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(btn) btn.classList.add('active');
+}
+
+function layerClass(type) {
+  if(type==='base') return 'layer-base';
+  if(type==='mid') return 'layer-mid';
+  return 'layer-outer';
+}
+
+function showRegion(r) {
+  const pros = r.pros.map(p=>`<span class="pill pill-green">${p}</span>`).join('');
+  const cons = r.cons.map(c=>`<span class="pill pill-red">${c}</span>`).join('');
+  const layers = r.layers.map(l=>`
+    <div class="layer-item">
+      <span class="layer-badge ${layerClass(l.type)}">${l.label}</span>
+      <span style="color:var(--muted);font-size:11px;line-height:1.5;">${l.desc}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('region-content').innerHTML = `
+    <div class="region-header">
+      <span class="region-dot" style="background:${r.color}"></span>
+      <span class="region-name">${r.name}</span>
+    </div>
+    <div class="info-grid">
+      <div class="info-row"><span class="info-label">Terrain</span><span class="info-val">${r.terrain}</span></div>
+      <div class="info-row"><span class="info-label">Species</span><span class="info-val">${r.species}</span></div>
+      <div class="info-row"><span class="info-label">Public land</span><span class="info-val">${r.publicLand}</span></div>
+      <div class="info-row"><span class="info-label">Drive from Spokane</span><span class="info-val">${r.drive}</span></div>
+      <div class="info-row"><span class="info-label">WA success rate</span><span class="info-val">${r.success}</span></div>
+      <div class="info-row"><span class="info-label">Spotting scope</span><span class="info-val">${r.scope}</span></div>
+      <div class="info-row"><span class="info-label">Top GMUs</span><span class="info-val">${r.topGMUs}</span></div>
+      <div class="info-row"><span class="info-label">Access</span><span class="info-val">${r.access}</span></div>
+    </div>
+    <div class="section-label">Pros</div>
+    <div class="pill-row">${pros}</div>
+    <div class="section-label">Cons</div>
+    <div class="pill-row">${cons}</div>
+    <div class="section-label">Weather · October hunting season</div>
+    <div class="weather-box">
+      <strong>Conditions:</strong> ${r.weather}
+      <div class="layer-row">${layers}</div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(91,163,212,0.15);">
+        <strong>Also pack:</strong> ${r.weatherExtra}
+      </div>
+    </div>
+  `;
+
+  showTab('region', document.querySelectorAll('.tab')[1]);
+}
+
+function buildMap() {
+  const W = document.getElementById('map-container').clientWidth || 580;
+  const H = document.getElementById('map-container').clientHeight || 340;
+  d3.select('#map-container svg').remove();
+
+  const svg = d3.select('#map-container').append('svg')
+    .attr('width','100%').attr('height','100%')
+    .attr('viewBox',`0 0 ${W} ${H}`);
+
+  const proj = d3.geoMercator().center([-120.5,47.35]).scale(W*5.8).translate([W/2,H/2]);
+  const path = d3.geoPath(proj);
+  const tooltip = document.getElementById('tooltip');
+
+  d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json').then(us => {
+    const allCounties = topojson.feature(us, us.objects.counties).features;
+    const allStates = topojson.feature(us, us.objects.states).features;
+    const waState = allStates.find(d => d.id==='53');
+    const waCounties = allCounties.filter(d => String(d.id).startsWith('53'));
+
+    svg.append('path').datum(waState).attr('d',path).attr('fill','#1a2029').attr('stroke','none');
+
+    svg.selectAll('.county-path').data(waCounties).join('path')
+      .attr('class','county-path')
+      .attr('d',path)
+      .attr('fill',d=>{ const r=countyToRegion[d.properties.name]; return r?r.color:'#222a33'; })
+      .attr('stroke','rgba(255,255,255,0.06)')
+      .attr('stroke-width',0.3)
+      .on('mousemove',function(event,d){
+        const r=countyToRegion[d.properties.name];
+        tooltip.style.opacity='1';
+        tooltip.style.left=(event.offsetX+10)+'px';
+        tooltip.style.top=(event.offsetY-10)+'px';
+        tooltip.innerHTML=r
+          ?`<strong style="color:${r.color}">${r.name}</strong><br><span style="color:#8a9099;font-size:10px;">${d.properties.name} County</span>`
+          :`<span style="color:#8a9099;">${d.properties.name} County</span>`;
+      })
+      .on('mouseleave',()=>{ tooltip.style.opacity='0'; })
+      .on('click',function(event,d){
+        const r=countyToRegion[d.properties.name];
+        if(r) showRegion(r);
+        svg.selectAll('.county-path').attr('stroke','rgba(255,255,255,0.06)').attr('stroke-width',0.3);
+        if(r) svg.selectAll('.county-path')
+          .filter(dd=>countyToRegion[dd.properties&&dd.properties.name]===r)
+          .attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.2);
+        document.querySelectorAll('.legend-item').forEach(el=>el.classList.remove('active'));
+        if(r) document.querySelector(`.legend-item[data-id="${r.id}"]`)?.classList.add('active');
+      });
+
+    [{name:'Spokane',coords:[-117.43,47.66],primary:true},
+     {name:'Seattle',coords:[-122.33,47.61],primary:false},
+     {name:'Yakima',coords:[-120.51,46.60],primary:false},
+     {name:'Walla Walla',coords:[-118.34,46.07],primary:false}
+    ].forEach(c=>{
+      const [cx,cy]=proj(c.coords);
+      svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',c.primary?4:2.5)
+        .attr('fill',c.primary?'#c8a96e':'#8a9099').attr('stroke','#0e1114').attr('stroke-width',1);
+      svg.append('text').attr('x',cx+6).attr('y',cy+4)
+        .attr('font-size',c.primary?'11px':'9px')
+        .attr('fill',c.primary?'#c8a96e':'#8a9099')
+        .attr('font-family','DM Sans,sans-serif').attr('font-weight','500')
+        .text(c.name);
+    });
+  });
+}
+
+buildMap();
+
+const legend = document.getElementById('legend');
+regions.forEach(r=>{
+  const el=document.createElement('div');
+  el.className='legend-item';
+  el.setAttribute('data-id',r.id);
+  el.innerHTML=`<span class="legend-swatch" style="background:${r.color}"></span>${r.name}`;
+  el.addEventListener('click',()=>{
+    document.querySelectorAll('.legend-item').forEach(e=>e.classList.remove('active'));
+    el.classList.add('active');
+    showRegion(r);
+    const svg=d3.select('#map-container svg');
+    svg.selectAll('.county-path').attr('stroke','rgba(255,255,255,0.06)').attr('stroke-width',0.3);
+    svg.selectAll('.county-path').filter(d=>countyToRegion[d.properties&&d.properties.name]===r)
+      .attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.2);
+  });
+  legend.appendChild(el);
+});
+</script>
+
+</body>
+</html>
